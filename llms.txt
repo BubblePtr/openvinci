@@ -1,0 +1,14 @@
+# OpenVinci
+
+> Visual tools for agents. `vinci` turns a prompt into a local image file in one shell call. No SDK, no MCP, no daemon.
+
+## Docs
+
+- [SKILL.md](https://raw.githubusercontent.com/BubblePtr/openvinci/main/SKILL.md): Agent install and calling contract — start here
+- [README.md](https://raw.githubusercontent.com/BubblePtr/openvinci/main/README.md): Human-facing install and usage
+- [install.sh](https://raw.githubusercontent.com/BubblePtr/openvinci/main/install.sh): One-line installer used by the skill
+
+## Optional
+
+- [ADR-0003 async envelopes](https://raw.githubusercontent.com/BubblePtr/openvinci/main/docs/adr/0003-async-gateway-polling.md): Why vinci polls task ids internally
+- [Release process](https://raw.githubusercontent.com/BubblePtr/openvinci/main/docs/release.md): How humans cut a GitHub Release

@@ -94,28 +94,17 @@ An existing target file is overwritten silently, so rerunning the same command i
 
 ## For AI agents
 
-`vinci --help` is the single source of truth for the calling contract. To make an agent reach for the tool on its own, drop this block into your project's `CLAUDE.md` or `AGENTS.md`:
+Paste one of these to the agent. It will fetch the skill and do the rest.
 
-````markdown
-## Generating images
-
-Use `vinci` when a task needs an illustration, icon, hero image or other visual asset: it turns a text prompt into a local image file in one shell call, with no SDK or MCP server. Requires `OPENAI_API_KEY` in the environment.
-
-If `vinci` is not on PATH:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/BubblePtr/openvinci/main/install.sh | sh
-export PATH="$HOME/.local/bin:$PATH"
+```text
+Read https://raw.githubusercontent.com/BubblePtr/openvinci/main/SKILL.md and follow the instructions to install and use vinci.
 ```
 
-Always pass `--json`:
-
-```bash
-vinci "minimal technical illustration of an AI agent" -o ./assets/hero.png --json
+```text
+读取 https://raw.githubusercontent.com/BubblePtr/openvinci/main/SKILL.md，并按其中说明安装并使用 vinci。
 ```
 
-Success prints `{"path","size","format","model","duration_ms"}`. Failure prints `{"error":{"code","message"}}` with a non-zero exit code. Run `vinci --help` for the full contract.
-````
+The skill is the agent-facing contract. `vinci --help` is the live CLI contract if the two ever disagree. Discovery index: [llms.txt](https://raw.githubusercontent.com/BubblePtr/openvinci/main/llms.txt).
 
 ## Flags
 
