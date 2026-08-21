@@ -13,7 +13,9 @@ On success, plain mode prints only the absolute output path on stdout. `--json` 
 
 ## Quick start
 
-Paste this to an agent. That is the primary way to use OpenVinci.
+### For agents
+
+Paste this to the agent:
 
 ```text
 Read https://raw.githubusercontent.com/BubblePtr/openvinci/main/SKILL.md and follow the instructions to install and use vinci.
@@ -25,7 +27,7 @@ Read https://raw.githubusercontent.com/BubblePtr/openvinci/main/SKILL.md and fol
 
 The skill is the agent-facing contract. `vinci --help` is the live CLI contract if the two ever disagree. Discovery index: [llms.txt](https://raw.githubusercontent.com/BubblePtr/openvinci/main/llms.txt).
 
-To install and run it yourself:
+### Manual
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/BubblePtr/openvinci/main/install.sh | sh
