@@ -60,6 +60,20 @@ cat prompt.txt | vinci --background transparent --json -o ./assets/icon.png
 
 An existing target file is overwritten silently, so rerunning the same command is idempotent, like `curl -o`.
 
+## For AI agents
+
+`vinci --help` is the single source of truth for the calling contract. To make an agent reach for the tool on its own, drop this block into your project's `CLAUDE.md` or `AGENTS.md`:
+
+```markdown
+## Generating images
+
+Use `vinci` when a task needs an illustration, icon, hero image or other visual asset: it turns a text prompt into a local image file in one shell call, with no SDK or MCP server. Requires `OPENAI_API_KEY` in the environment.
+
+    vinci "minimal technical illustration of an AI agent" -o ./assets/hero.png --json
+
+Always pass `--json`: it prints `{"path","size","format","model","duration_ms"}` on success, or `{"error":{"code","message"}}` with a non-zero exit code on failure. Run `vinci --help` for the full contract.
+```
+
 ## Flags
 
 | Flag | Default | Description |
