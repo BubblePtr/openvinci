@@ -11,13 +11,36 @@ vinci "minimal technical illustration of an AI agent" -o ./assets/hero.png
 
 On success, plain mode prints only the absolute output path on stdout. `--json` prints a machine-readable result object. Every failure has a stable error code and a layered exit code.
 
+## Quick start
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/BubblePtr/openvinci/main/install.sh | sh
+export PATH="$HOME/.local/bin:$PATH"
+export OPENAI_API_KEY="sk-..."
+
+vinci "minimal technical illustration of an AI agent" -o ./assets/hero.png --json
+```
+
+A gateway uses the same command, plus a base URL and a model alias if the key is scoped to one:
+
+```bash
+export OPENAI_BASE_URL="https://api.example.com/v1"
+vinci "minimal technical illustration of an AI agent" -o ./assets/hero.png --model gpt-image-2-official --json
+```
+
 ## Install
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/BubblePtr/openvinci/main/install.sh | sh
 ```
 
-That puts a static `vinci` binary in `~/.local/bin` (override with `--dir` or `VINCI_INSTALL_DIR`). Supported platforms: macOS arm64, Linux x64/arm64. Pin a release with `sh -s -- --version v0.1.0`.
+That puts a static `vinci` binary in `~/.local/bin` (override with `--dir` or `VINCI_INSTALL_DIR`). Supported platforms: macOS arm64, Linux x64/arm64.
+
+Pin a release:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/BubblePtr/openvinci/main/install.sh | sh -s -- --version v0.1.0
+```
 
 From source (Go 1.24+):
 
@@ -27,7 +50,12 @@ go build -o vinci ./cmd/vinci
 
 ## Configuration
 
-Two environment variables, no config file:
+Two environment variables, no config file. Copy and fill in:
+
+```bash
+export OPENAI_API_KEY="sk-..."                             # required
+export OPENAI_BASE_URL="https://api.openai.com"            # optional; any OpenAI-compatible gateway
+```
 
 | Variable | Required | Description |
 | --- | --- | --- |
@@ -68,17 +96,26 @@ An existing target file is overwritten silently, so rerunning the same command i
 
 `vinci --help` is the single source of truth for the calling contract. To make an agent reach for the tool on its own, drop this block into your project's `CLAUDE.md` or `AGENTS.md`:
 
-```markdown
+````markdown
 ## Generating images
 
-Use `vinci` when a task needs an illustration, icon, hero image or other visual asset: it turns a text prompt into a local image file in one shell call, with no SDK or MCP server. Requires `OPENAI_API_KEY` in the environment. If `vinci` is not on PATH:
+Use `vinci` when a task needs an illustration, icon, hero image or other visual asset: it turns a text prompt into a local image file in one shell call, with no SDK or MCP server. Requires `OPENAI_API_KEY` in the environment.
 
-    curl -fsSL https://raw.githubusercontent.com/BubblePtr/openvinci/main/install.sh | sh
+If `vinci` is not on PATH:
 
-    vinci "minimal technical illustration of an AI agent" -o ./assets/hero.png --json
-
-Always pass `--json`: it prints `{"path","size","format","model","duration_ms"}` on success, or `{"error":{"code","message"}}` with a non-zero exit code on failure. Run `vinci --help` for the full contract.
+```bash
+curl -fsSL https://raw.githubusercontent.com/BubblePtr/openvinci/main/install.sh | sh
+export PATH="$HOME/.local/bin:$PATH"
 ```
+
+Always pass `--json`:
+
+```bash
+vinci "minimal technical illustration of an AI agent" -o ./assets/hero.png --json
+```
+
+Success prints `{"path","size","format","model","duration_ms"}`. Failure prints `{"error":{"code","message"}}` with a non-zero exit code. Run `vinci --help` for the full contract.
+````
 
 ## Flags
 
