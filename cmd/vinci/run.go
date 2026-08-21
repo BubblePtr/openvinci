@@ -84,16 +84,41 @@ func report(err *cliError, jsonMode bool, stdout, stderr io.Writer) int {
 	return err.exit
 }
 
+// hasJSONFlag pre-scans for --json so that failures are reported in the mode
+// the caller asked for even when parsing itself fails. It must agree with
+// parseArgs: same terminator, same last-one-wins rule, and an unparseable
+// value counts as enabled so that its own usage error arrives as JSON.
 func hasJSONFlag(args []string) bool {
+	enabled := false
 	for _, a := range args {
 		if a == "--" {
-			return false
+			break
 		}
-		if a == "--json" || a == "-json" {
-			return true
+		name, value, hasValue := splitFlag(a)
+		if name != "json" {
+			continue
 		}
+		if !hasValue {
+			enabled = true
+			continue
+		}
+		parsed, err := strconv.ParseBool(value)
+		enabled = err != nil || parsed
 	}
-	return false
+	return enabled
+}
+
+// splitFlag decomposes "--flag=value" into its parts. A non-flag argument
+// yields an empty name.
+func splitFlag(arg string) (name, value string, hasValue bool) {
+	if !strings.HasPrefix(arg, "-") || arg == "-" || arg == "--" {
+		return "", "", false
+	}
+	name = strings.TrimPrefix(strings.TrimPrefix(arg, "-"), "-")
+	if idx := strings.IndexByte(name, '='); idx >= 0 {
+		return name[:idx], name[idx+1:], true
+	}
+	return name, "", false
 }
 
 type options struct {
@@ -154,12 +179,7 @@ func parseArgs(args []string) (*options, *cliError) {
 			continue
 		}
 
-		name := strings.TrimPrefix(strings.TrimPrefix(arg, "-"), "-")
-		value := ""
-		hasValue := false
-		if idx := strings.IndexByte(name, '='); idx >= 0 {
-			name, value, hasValue = name[:idx], name[idx+1:], true
-		}
+		name, value, hasValue := splitFlag(arg)
 
 		// takeValue pulls the value from "--flag=value" or "--flag value".
 		takeValue := func() (string, *cliError) {
@@ -181,6 +201,14 @@ func parseArgs(args []string) (*options, *cliError) {
 			opts.version = true
 		case "json":
 			opts.jsonMode = true
+			if hasValue {
+				enabled, err := strconv.ParseBool(value)
+				if err != nil {
+					perr = usageErrorf("invalid value %q for --json: want true or false", value)
+					break
+				}
+				opts.jsonMode = enabled
+			}
 		case "o", "output":
 			opts.output, perr = takeValue()
 		case "size":
@@ -238,14 +266,12 @@ func parseTimeout(raw string) (time.Duration, *cliError) {
 	return d, nil
 }
 
-// resolvePrompt implements the Prompt entry rule: positional argument wins,
-// stdin is used only when there is no positional argument, and supplying both
-// or neither is a usage error.
+// resolvePrompt implements the Prompt entry rule: a positional argument wins
+// outright and stdin is then never read at all. Probing stdin to detect a
+// second prompt source would block forever on the open-but-idle pipe that
+// agent harnesses hand their child processes.
 func resolvePrompt(opts *options, stdin io.Reader) *cliError {
 	if opts.prompt != "" {
-		if stdinHasData(stdin) {
-			return usageErrorf("prompt given as both an argument and on stdin; use one or the other")
-		}
 		return nil
 	}
 	data, err := io.ReadAll(stdin)
@@ -259,18 +285,16 @@ func resolvePrompt(opts *options, stdin io.Reader) *cliError {
 	return nil
 }
 
-func stdinHasData(stdin io.Reader) bool {
-	var probe [1]byte
-	n, _ := stdin.Read(probe[:])
-	return n > 0
-}
-
 func usageText() string {
 	return `vinci — visual tools for agents. Generate an image from a prompt.
 
 Usage:
   vinci [flags] "<prompt>"
   echo "<prompt>" | vinci [flags]
+
+The prompt is the positional argument; stdin is read only when no positional
+argument is given. Use -- to end flag parsing for a prompt starting with "-":
+  vinci -o hero.png -- "-a prompt starting with a dash"
 
 Flags:
   -o, --output <path>   output file path (default: slug filename from the prompt, in the current directory)

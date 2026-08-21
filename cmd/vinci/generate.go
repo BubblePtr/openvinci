@@ -74,12 +74,12 @@ func generate(opts *options, env func(string) string, stdout, stderr io.Writer) 
 		return cerr
 	}
 
-	image, cerr := requestImage(opts, apiKey, env("OPENAI_BASE_URL"))
+	result, cerr := requestImage(opts, apiKey, env("OPENAI_BASE_URL"))
 	if cerr != nil {
 		return cerr
 	}
 
-	if err := writeImage(outputPath, image); err != nil {
+	if err := writeImage(outputPath, result.image); err != nil {
 		return errorf(codeWriteFailed, exitIO, "cannot write %s: %v", outputPath, err)
 	}
 
@@ -90,7 +90,7 @@ func generate(opts *options, env func(string) string, stdout, stderr io.Writer) 
 			Format     string `json:"format"`
 			Model      string `json:"model"`
 			DurationMS int64  `json:"duration_ms"`
-		}{outputPath, opts.size, opts.format, defaultModel, time.Since(started).Milliseconds()}
+		}{outputPath, reportedSize(result.size, opts.size), opts.format, defaultModel, time.Since(started).Milliseconds()}
 		enc := json.NewEncoder(stdout)
 		enc.SetEscapeHTML(false)
 		_ = enc.Encode(result)
@@ -159,6 +159,23 @@ func writeImage(path string, data []byte) error {
 	return os.WriteFile(path, data, 0o644)
 }
 
+// reportedSize prefers the size the upstream says it rendered; a gateway that
+// omits it leaves the requested value ("auto" when none was asked for) as the
+// only honest answer.
+func reportedSize(fromResponse, requested string) string {
+	if s := strings.TrimSpace(fromResponse); s != "" {
+		return s
+	}
+	return requested
+}
+
+// generated is one Generation's result: the decoded image plus what the
+// upstream reported about it.
+type generated struct {
+	image []byte
+	size  string
+}
+
 type upstreamError struct {
 	Error struct {
 		Code    string `json:"code"`
@@ -167,7 +184,7 @@ type upstreamError struct {
 	} `json:"error"`
 }
 
-func requestImage(opts *options, apiKey, baseURL string) ([]byte, *cliError) {
+func requestImage(opts *options, apiKey, baseURL string) (generated, *cliError) {
 	payload := map[string]any{
 		"model":         defaultModel,
 		"prompt":        opts.prompt,
@@ -180,7 +197,7 @@ func requestImage(opts *options, apiKey, baseURL string) ([]byte, *cliError) {
 	}
 	body, err := json.Marshal(payload)
 	if err != nil {
-		return nil, errorf(codeAPIError, exitAPI, "cannot encode request: %v", err)
+		return generated{}, errorf(codeAPIError, exitAPI, "cannot encode request: %v", err)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), opts.timeout)
@@ -189,7 +206,7 @@ func requestImage(opts *options, apiKey, baseURL string) ([]byte, *cliError) {
 	endpoint := generationsEndpoint(baseURL)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
-		return nil, errorf(codeNetworkError, exitAPI, "invalid upstream URL %s: %v", endpoint, err)
+		return generated{}, errorf(codeNetworkError, exitAPI, "invalid upstream URL %s: %v", endpoint, err)
 	}
 	req.Header.Set("Authorization", "Bearer "+apiKey)
 	req.Header.Set("Content-Type", "application/json")
@@ -197,40 +214,42 @@ func requestImage(opts *options, apiKey, baseURL string) ([]byte, *cliError) {
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			return nil, errorf(codeNetworkError, exitAPI, "upstream request timed out after %s", opts.timeout)
+			return generated{}, errorf(codeNetworkError, exitAPI, "upstream request timed out after %s", opts.timeout)
 		}
-		return nil, errorf(codeNetworkError, exitAPI, "cannot reach upstream %s: %v", endpoint, err)
+		return generated{}, errorf(codeNetworkError, exitAPI, "cannot reach upstream %s: %v", endpoint, err)
 	}
 	defer resp.Body.Close()
 
 	raw, err := io.ReadAll(resp.Body)
 	if err != nil {
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			return nil, errorf(codeNetworkError, exitAPI, "upstream request timed out after %s", opts.timeout)
+			return generated{}, errorf(codeNetworkError, exitAPI, "upstream request timed out after %s", opts.timeout)
 		}
-		return nil, errorf(codeNetworkError, exitAPI, "cannot read upstream response: %v", err)
+		return generated{}, errorf(codeNetworkError, exitAPI, "cannot read upstream response: %v", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, upstreamFailure(resp.StatusCode, raw)
+		return generated{}, upstreamFailure(resp.StatusCode, raw)
 	}
 
 	var decoded struct {
+		Size string `json:"size"`
 		Data []struct {
 			B64JSON string `json:"b64_json"`
+			Size    string `json:"size"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(raw, &decoded); err != nil {
-		return nil, errorf(codeAPIError, exitAPI, "upstream returned HTTP 200 with an unreadable body: %v", err)
+		return generated{}, errorf(codeAPIError, exitAPI, "upstream returned HTTP 200 with an unreadable body: %v", err)
 	}
 	if len(decoded.Data) == 0 || decoded.Data[0].B64JSON == "" {
-		return nil, errorf(codeAPIError, exitAPI, "upstream returned HTTP 200 without image data")
+		return generated{}, errorf(codeAPIError, exitAPI, "upstream returned HTTP 200 without image data")
 	}
 	image, err := base64.StdEncoding.DecodeString(decoded.Data[0].B64JSON)
 	if err != nil {
-		return nil, errorf(codeAPIError, exitAPI, "upstream returned invalid base64 image data: %v", err)
+		return generated{}, errorf(codeAPIError, exitAPI, "upstream returned invalid base64 image data: %v", err)
 	}
-	return image, nil
+	return generated{image: image, size: reportedSize(decoded.Size, decoded.Data[0].Size)}, nil
 }
 
 // upstreamFailure maps an upstream error body onto the Error Contract, lifting

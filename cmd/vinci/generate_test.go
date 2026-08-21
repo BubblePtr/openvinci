@@ -79,6 +79,12 @@ func newFakeUpstream(t *testing.T) *fakeUpstream {
 }
 
 func successBody(img []byte) string {
+	return `{"created":1,"size":"1024x1024","quality":"high","output_format":"png","data":[{"b64_json":"` +
+		base64.StdEncoding.EncodeToString(img) + `"}]}`
+}
+
+// successBodyWithoutSize mimics a gateway that drops the size echo.
+func successBodyWithoutSize(img []byte) string {
 	return `{"created":1,"data":[{"b64_json":"` + base64.StdEncoding.EncodeToString(img) + `"}]}`
 }
 

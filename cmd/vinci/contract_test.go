@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func decodeJSONOutput(t *testing.T, out string) map[string]any {
@@ -98,6 +99,47 @@ func TestPromptCanBeReadFromStdin(t *testing.T) {
 	}
 }
 
+// A positional prompt wins outright: stdin is never read, so an open-but-idle
+// pipe handed over by an agent harness cannot hang the CLI.
+func TestPositionalPromptNeverReadsStdin(t *testing.T) {
+	f := newFakeUpstream(t)
+	h := newHarnessWith(t, f)
+	dir := chdirTemp(t)
+	pipe := &silentPipe{read: make(chan struct{})}
+	h.stdinReader = pipe
+
+	done := make(chan int, 1)
+	go func() { done <- h.run("a red bicycle", "-o", filepath.Join(dir, "hero.png")) }()
+
+	select {
+	case code := <-done:
+		if code != 0 {
+			t.Fatalf("exit code = %d, want 0 (stderr: %s)", code, h.err())
+		}
+	case <-pipe.read:
+		t.Fatal("run() read stdin even though a positional prompt was given")
+	case <-time.After(10 * time.Second):
+		t.Fatal("run() blocked, most likely on stdin")
+	}
+	if got := f.onlyCall(t).body["prompt"]; got != "a red bicycle" {
+		t.Errorf("upstream prompt = %q, want the positional argument", got)
+	}
+}
+
+func TestPositionalPromptWinsOverStdinContent(t *testing.T) {
+	f := newFakeUpstream(t)
+	h := newHarnessWith(t, f)
+	dir := chdirTemp(t)
+	h.stdin = "a prompt from stdin"
+
+	if code := h.run("a prompt from the argument", "-o", filepath.Join(dir, "hero.png")); code != 0 {
+		t.Fatalf("exit code = %d, want 0 (stderr: %s)", code, h.err())
+	}
+	if got := f.onlyCall(t).body["prompt"]; got != "a prompt from the argument" {
+		t.Errorf("upstream prompt = %q, want the positional argument", got)
+	}
+}
+
 func TestFlagsMayPrecedeThePromptArgument(t *testing.T) {
 	f := newFakeUpstream(t)
 	h := newHarnessWith(t, f)
@@ -108,6 +150,76 @@ func TestFlagsMayPrecedeThePromptArgument(t *testing.T) {
 	}
 	if got := f.onlyCall(t).body["prompt"]; got != "a red bicycle" {
 		t.Errorf("upstream prompt = %q, want %q", got, "a red bicycle")
+	}
+}
+
+func TestDashDashTerminatesFlagsForAPromptStartingWithADash(t *testing.T) {
+	f := newFakeUpstream(t)
+	h := newHarnessWith(t, f)
+	dir := chdirTemp(t)
+
+	if code := h.run("-o", filepath.Join(dir, "hero.png"), "--", "-a dash-leading prompt"); code != 0 {
+		t.Fatalf("exit code = %d, want 0 (stderr: %s)", code, h.err())
+	}
+	if got := f.onlyCall(t).body["prompt"]; got != "-a dash-leading prompt" {
+		t.Errorf("upstream prompt = %q, want the argument after --", got)
+	}
+}
+
+func TestJSONFlagAcceptsAnExplicitBooleanValue(t *testing.T) {
+	for _, tc := range []struct {
+		arg      string
+		wantJSON bool
+	}{
+		{"--json", true},
+		{"--json=true", true},
+		{"--json=false", false},
+	} {
+		t.Run(tc.arg, func(t *testing.T) {
+			f := newFakeUpstream(t)
+			h := newHarnessWith(t, f)
+			dir := chdirTemp(t)
+
+			if code := h.run("a red bicycle", "-o", filepath.Join(dir, "hero.png"), tc.arg); code != 0 {
+				t.Fatalf("exit code = %d, want 0 (stderr: %s)", code, h.err())
+			}
+			isJSON := strings.HasPrefix(strings.TrimSpace(h.out()), "{")
+			if isJSON != tc.wantJSON {
+				t.Errorf("%s produced stdout %q, json mode = %v, want %v", tc.arg, h.out(), isJSON, tc.wantJSON)
+			}
+		})
+	}
+}
+
+// The reporting mode is decided before parsing, so a rejected --json value
+// must be reported the same way parseArgs would have reported it.
+func TestJSONFlagWithANonBooleanValueIsUsageError(t *testing.T) {
+	h := newHarness()
+	h.env["OPENAI_API_KEY"] = "test-key"
+
+	if code := h.run("a red bicycle", "--json=maybe"); code != 2 {
+		t.Fatalf("exit code = %d, want 2", code)
+	}
+	if got := errorObject(t, h.out())["code"]; got != "usage_error" {
+		t.Errorf("error code = %v, want usage_error", got)
+	}
+	if h.err() != "" {
+		t.Errorf("stderr = %q, want empty: an invalid --json value still reports as JSON", h.err())
+	}
+}
+
+func TestJSONFalseReportsFailuresOnStderr(t *testing.T) {
+	h := newHarness()
+	h.env["OPENAI_API_KEY"] = "test-key"
+
+	if code := h.run("--json=false"); code != 2 {
+		t.Fatalf("exit code = %d, want 2", code)
+	}
+	if h.out() != "" {
+		t.Errorf("stdout = %q, want empty with --json=false", h.out())
+	}
+	if !strings.Contains(h.err(), "prompt") {
+		t.Errorf("stderr = %q, want the plain-text diagnostic", h.err())
 	}
 }
 
@@ -191,8 +303,9 @@ func TestJSONModeSuccessShape(t *testing.T) {
 	if filepath.Base(path) != "hero.png" {
 		t.Errorf("path = %v, want it to name hero.png", got["path"])
 	}
-	if got["size"] != "1536x1024" {
-		t.Errorf("size = %v, want 1536x1024", got["size"])
+	// The upstream is the authority on the size that was actually rendered.
+	if got["size"] != "1024x1024" {
+		t.Errorf("size = %v, want the size reported by the upstream (1024x1024)", got["size"])
 	}
 	if got["format"] != "png" {
 		t.Errorf("format = %v, want png", got["format"])
@@ -205,19 +318,36 @@ func TestJSONModeSuccessShape(t *testing.T) {
 	}
 }
 
-func TestJSONModeSuccessReportsAutoSizeWhenNotRequested(t *testing.T) {
+// A gateway that omits size leaves the requested value as the best answer.
+func TestJSONModeFallsBackToTheRequestedSize(t *testing.T) {
 	f := newFakeUpstream(t)
 	h := newHarnessWith(t, f)
 	dir := chdirTemp(t)
+	f.body = successBodyWithoutSize(fakeImage)
 
-	if code := h.run("a red bicycle", "-o", filepath.Join(dir, "hero.webp"), "--json"); code != 0 {
+	code := h.run("a red bicycle", "-o", filepath.Join(dir, "hero.webp"), "--size", "1536x1024", "--json")
+	if code != 0 {
 		t.Fatalf("exit code = %d, want 0 (stderr: %s)", code, h.err())
 	}
 	got := decodeJSONOutput(t, h.out())
-	if got["size"] != "auto" {
-		t.Errorf("size = %v, want auto", got["size"])
+	if got["size"] != "1536x1024" {
+		t.Errorf("size = %v, want the requested size as a fallback", got["size"])
 	}
 	if got["format"] != "webp" {
 		t.Errorf("format = %v, want webp", got["format"])
+	}
+}
+
+func TestJSONModeReportsAutoWhenNeitherSideKnowsTheSize(t *testing.T) {
+	f := newFakeUpstream(t)
+	h := newHarnessWith(t, f)
+	dir := chdirTemp(t)
+	f.body = successBodyWithoutSize(fakeImage)
+
+	if code := h.run("a red bicycle", "-o", filepath.Join(dir, "hero.png"), "--json"); code != 0 {
+		t.Fatalf("exit code = %d, want 0 (stderr: %s)", code, h.err())
+	}
+	if got := decodeJSONOutput(t, h.out())["size"]; got != "auto" {
+		t.Errorf("size = %v, want auto", got)
 	}
 }
