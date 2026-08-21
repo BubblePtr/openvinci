@@ -30,7 +30,7 @@ Two environment variables, no config file:
 | `OPENAI_API_KEY` | yes | The API key. Read from the environment only, never from a flag, so it stays out of shell history. |
 | `OPENAI_BASE_URL` | no | Any OpenAI-compatible gateway. Defaults to `https://api.openai.com`. A URL that already ends in `/v1` is accepted as-is. |
 
-The upstream model is fixed to `gpt-image-2`, and one `vinci` call is exactly one upstream request — there is no automatic retry, so latency and cost stay predictable.
+The upstream model defaults to `gpt-image-2`. Override it with `--model` for a gateway alias. A generation is one prompt to one local file: either the upstream returns the image immediately (`b64_json` or `url`), or it returns a task id and `vinci` polls until the image is ready. Polling is waiting, not a retry. There is no automatic retry of a failed generation, so latency and cost stay predictable. The `--timeout` covers the whole generation, including polls and the image download.
 
 ## Usage
 
@@ -79,12 +79,13 @@ Always pass `--json`: it prints `{"path","size","format","model","duration_ms"}`
 | Flag | Default | Description |
 | --- | --- | --- |
 | `-o`, `--output <path>` | slug filename from the prompt, in the current directory | Output path. Missing parent directories are created. |
+| `--model <name>` | `gpt-image-2` | Upstream model. Passed through unchanged, so a gateway alias such as `gpt-image-2-official` works. |
 | `--size <spec>` | `auto` | Image size, e.g. `1024x1024`, `1536x1024`. Passed straight through to the upstream. |
 | `--quality <q>` | `auto` | Rendering quality, e.g. `low`, `medium`, `high`. |
 | `--background <b>` | `auto` | Background, e.g. `transparent`, `opaque`. |
 | `--format <f>` | inferred from `--output`, else `png` | `png`, `jpeg` or `webp`. Contradicting the output extension is a usage error. |
 | `--moderation <m>` | `auto` | Moderation sensitivity, e.g. `low`, for when a prompt is refused unfairly. |
-| `--timeout <dur>` | `120s` | Upstream timeout, as seconds (`90`) or a duration (`90s`, `2m`). |
+| `--timeout <dur>` | `120s` | Generation timeout, as seconds (`90`) or a duration (`90s`, `2m`). Covers submit, polling, and download. |
 | `--json` | off | Print a result object on success, an error object on failure. `--json=false` explicitly disables it. |
 | `-h`, `--help` | | Show usage. |
 | `--version` | | Show the version. |

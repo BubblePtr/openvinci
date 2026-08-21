@@ -318,6 +318,21 @@ func TestJSONModeSuccessShape(t *testing.T) {
 	}
 }
 
+func TestJSONModeReportsTheRequestedModel(t *testing.T) {
+	f := newFakeUpstream(t)
+	h := newHarnessWith(t, f)
+	dir := chdirTemp(t)
+
+	code := h.run("a red bicycle", "-o", filepath.Join(dir, "hero.png"), "--model", "gpt-image-2-official", "--json")
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0 (stderr: %s)", code, h.err())
+	}
+	got := decodeJSONOutput(t, h.out())
+	if got["model"] != "gpt-image-2-official" {
+		t.Errorf("model = %v, want gpt-image-2-official", got["model"])
+	}
+}
+
 // A gateway that omits size leaves the requested value as the best answer.
 func TestJSONModeFallsBackToTheRequestedSize(t *testing.T) {
 	f := newFakeUpstream(t)

@@ -29,6 +29,15 @@ type fakeUpstream struct {
 	status int
 	body   string
 	delay  time.Duration
+
+	// asyncTaskID, if set, makes POST return a submitted task and GET
+	// /v1/tasks/{id} complete (or fail) according to the knobs below.
+	asyncTaskID      string
+	asyncPolls       int
+	asyncFailed      bool
+	asyncNeverDone   bool
+	asyncFailMessage string
+	polls            int
 }
 
 type upstreamRequest struct {
@@ -61,6 +70,15 @@ func newFakeUpstream(t *testing.T) *fakeUpstream {
 			raw:    string(raw),
 		})
 		delay, status, body := f.delay, f.status, f.body
+		taskID, pollsBefore, failed, neverDone, failMsg := f.asyncTaskID, f.asyncPolls, f.asyncFailed, f.asyncNeverDone, f.asyncFailMessage
+		path := r.URL.Path
+		if r.Method == http.MethodGet && isTaskPath(path) {
+			f.polls++
+			polls := f.polls
+			f.mu.Unlock()
+			f.writeTask(w, r, polls, pollsBefore, neverDone, failed, failMsg)
+			return
+		}
 		f.mu.Unlock()
 
 		if delay > 0 {
@@ -70,12 +88,51 @@ func newFakeUpstream(t *testing.T) *fakeUpstream {
 				return
 			}
 		}
+		if r.Method == http.MethodGet && path == "/generated.png" {
+			w.Header().Set("Content-Type", "image/png")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(fakeImage)
+			return
+		}
+		if taskID != "" && r.Method == http.MethodPost {
+			body = `{"code":200,"data":[{"status":"submitted","task_id":"` + taskID + `"}]}`
+			status = http.StatusOK
+		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(status)
 		_, _ = io.WriteString(w, body)
 	}))
 	t.Cleanup(f.server.Close)
 	return f
+}
+
+func isTaskPath(path string) bool {
+	return strings.HasPrefix(path, "/v1/tasks/") || strings.HasPrefix(path, "/tasks/")
+}
+
+func (f *fakeUpstream) writeTask(w http.ResponseWriter, r *http.Request, polls, pollsBefore int, neverDone, failed bool, failMsg string) {
+	if delay := f.delay; delay > 0 {
+		select {
+		case <-time.After(delay):
+		case <-r.Context().Done():
+			return
+		}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	if neverDone || polls <= pollsBefore {
+		_, _ = io.WriteString(w, `{"code":200,"data":{"id":"`+f.asyncTaskID+`","status":"processing"}}`)
+		return
+	}
+	if failed {
+		if failMsg == "" {
+			failMsg = "upstream exploded"
+		}
+		_, _ = io.WriteString(w, `{"code":200,"data":{"id":"`+f.asyncTaskID+`","status":"failed","error":{"message":"`+failMsg+`"}}}`)
+		return
+	}
+	url := f.server.URL + "/generated.png"
+	_, _ = io.WriteString(w, `{"code":200,"data":{"id":"`+f.asyncTaskID+`","status":"completed","result":{"images":[{"url":["`+url+`"]}]}}}`)
 }
 
 func successBody(img []byte) string {
@@ -224,6 +281,7 @@ func TestGeneratePassesFlagValuesThroughUnchanged(t *testing.T) {
 		"--quality", "low",
 		"--background", "transparent",
 		"--moderation", "low",
+		"--model", "gpt-image-2-official",
 	)
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0 (stderr: %s)", code, h.err())
@@ -231,6 +289,7 @@ func TestGeneratePassesFlagValuesThroughUnchanged(t *testing.T) {
 
 	call := f.onlyCall(t)
 	want := map[string]any{
+		"model":         "gpt-image-2-official",
 		"size":          "1536x1024",
 		"quality":       "low",
 		"background":    "transparent",
@@ -255,5 +314,46 @@ func TestGenerateAcceptsBaseURLThatAlreadyEndsInV1(t *testing.T) {
 	}
 	if got := f.onlyCall(t).path; got != "/v1/images/generations" {
 		t.Errorf("path = %s, want /v1/images/generations", got)
+	}
+}
+
+func TestGenerateDownloadsASynchronousImageURL(t *testing.T) {
+	f := newFakeUpstream(t)
+	h := newHarnessWith(t, f)
+	dir := chdirTemp(t)
+	f.body = `{"created":1,"size":"1024x1024","data":[{"url":"` + f.server.URL + `/generated.png"}]}`
+
+	if code := h.run("a red bicycle", "-o", "hero.png"); code != 0 {
+		t.Fatalf("exit code = %d, want 0 (stderr: %s)", code, h.err())
+	}
+	assertGeneratedFile(t, h.out(), dir, "hero.png", fakeImage)
+}
+
+func TestGeneratePollsAnAsyncTaskAndDownloadsTheImage(t *testing.T) {
+	f := newFakeUpstream(t)
+	h := newHarnessWith(t, f)
+	dir := chdirTemp(t)
+	f.asyncTaskID = "task_test"
+
+	if code := h.run("a red bicycle", "-o", "hero.png"); code != 0 {
+		t.Fatalf("exit code = %d, want 0 (stderr: %s)", code, h.err())
+	}
+	assertGeneratedFile(t, h.out(), dir, "hero.png", fakeImage)
+
+	var methods []string
+	for _, c := range f.calls() {
+		methods = append(methods, c.method+" "+c.path)
+	}
+	if len(methods) < 3 {
+		t.Fatalf("upstream calls = %v, want POST generations, GET task, GET image", methods)
+	}
+	if methods[0] != "POST /v1/images/generations" {
+		t.Errorf("first call = %q, want POST /v1/images/generations", methods[0])
+	}
+	if methods[1] != "GET /v1/tasks/task_test" {
+		t.Errorf("second call = %q, want GET /v1/tasks/task_test", methods[1])
+	}
+	if methods[2] != "GET /generated.png" {
+		t.Errorf("third call = %q, want GET /generated.png", methods[2])
 	}
 }
