@@ -70,6 +70,25 @@ func TestHelpPrintsUsageToStdout(t *testing.T) {
 	}
 }
 
+// --help is the single source of truth for calling agents, so it must state
+// what the tool is for and steer them at the machine-readable contract.
+func TestHelpStatesWhenAnAgentShouldUseTheTool(t *testing.T) {
+	h := newHarness()
+	if code := h.run("--help"); code != 0 {
+		t.Fatalf("exit code = %d, want 0", code)
+	}
+	// The positioning belongs at the top, before the usage block.
+	head, _, found := strings.Cut(h.out(), "Usage:")
+	if !found {
+		t.Fatalf("help output has no Usage: section:\n%s", h.out())
+	}
+	for _, want := range []string{"agent", "illustration", "no SDK", "MCP", "--json"} {
+		if !strings.Contains(head, want) {
+			t.Errorf("help preamble missing %q; got:\n%s", want, head)
+		}
+	}
+}
+
 func TestNoPromptIsUsageError(t *testing.T) {
 	h := newHarness()
 	h.env["OPENAI_API_KEY"] = "test-key"
