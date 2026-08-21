@@ -1,0 +1,57 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+version: 2
+
+project_name: vinci
+
+before:
+  hooks:
+    - go test ./...
+    - sh install_test.sh
+
+builds:
+  - id: vinci
+    main: ./cmd/vinci
+    binary: vinci
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: darwin
+        goarch: amd64
+
+archives:
+  - ids: [vinci]
+    formats: [tar.gz]
+    # Version lives in the download URL; keep the filename OS/arch only so
+    # install.sh can construct it without parsing the tag twice.
+    name_template: "vinci_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
+      - README.md
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+
+changelog:
+  sort: asc
+  use: git
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^ci:"
+
+release:
+  github:
+    owner: BubblePtr
+    name: openvinci

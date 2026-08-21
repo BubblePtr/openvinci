@@ -13,13 +13,17 @@ On success, plain mode prints only the absolute output path on stdout. `--json` 
 
 ## Install
 
-Build from source (Go 1.24+):
+```bash
+curl -fsSL https://raw.githubusercontent.com/BubblePtr/openvinci/main/install.sh | sh
+```
+
+That puts a static `vinci` binary in `~/.local/bin` (override with `--dir` or `VINCI_INSTALL_DIR`). Supported platforms: macOS arm64, Linux x64/arm64. Pin a release with `sh -s -- --version v0.1.0`.
+
+From source (Go 1.24+):
 
 ```bash
 go build -o vinci ./cmd/vinci
 ```
-
-Then move `vinci` onto your `PATH`. Prebuilt binaries for macOS arm64 and Linux x64/arm64 are published on GitHub Releases.
 
 ## Configuration
 
@@ -67,7 +71,9 @@ An existing target file is overwritten silently, so rerunning the same command i
 ```markdown
 ## Generating images
 
-Use `vinci` when a task needs an illustration, icon, hero image or other visual asset: it turns a text prompt into a local image file in one shell call, with no SDK or MCP server. Requires `OPENAI_API_KEY` in the environment.
+Use `vinci` when a task needs an illustration, icon, hero image or other visual asset: it turns a text prompt into a local image file in one shell call, with no SDK or MCP server. Requires `OPENAI_API_KEY` in the environment. If `vinci` is not on PATH:
+
+    curl -fsSL https://raw.githubusercontent.com/BubblePtr/openvinci/main/install.sh | sh
 
     vinci "minimal technical illustration of an AI agent" -o ./assets/hero.png --json
 
@@ -135,9 +141,12 @@ Error codes are part of the public contract: build retry logic on them, not on m
 
 ```bash
 go test ./...            # fully offline, against a fake upstream
+sh install_test.sh       # platform detection for the install script
 go vet ./... && gofmt -l .
 VINCI_LIVE_TEST=1 go test ./... -run Live   # opt-in smoke test against the real API
 ```
+
+Releases are cut by tagging `main` (`v0.1.0`); see `docs/release.md`.
 
 ## License
 
