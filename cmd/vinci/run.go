@@ -124,6 +124,7 @@ func splitFlag(arg string) (name, value string, hasValue bool) {
 type options struct {
 	prompt         string
 	output         string
+	model          string
 	size           string
 	quality        string
 	background     string
@@ -160,6 +161,7 @@ func execute(args []string, env func(string) string, stdin io.Reader, stdout, st
 
 func parseArgs(args []string) (*options, *cliError) {
 	opts := &options{
+		model:      defaultModel,
 		size:       defaultAuto,
 		quality:    defaultAuto,
 		background: defaultAuto,
@@ -211,6 +213,8 @@ func parseArgs(args []string) (*options, *cliError) {
 			}
 		case "o", "output":
 			opts.output, perr = takeValue()
+		case "model":
+			opts.model, perr = takeValue()
 		case "size":
 			opts.size, perr = takeValue()
 		case "quality":
@@ -302,12 +306,13 @@ argument is given. Use -- to end flag parsing for a prompt starting with "-":
 
 Flags:
   -o, --output <path>   output file path (default: slug filename from the prompt, in the current directory)
+      --model <name>    upstream model (default: gpt-image-2)
       --size <spec>     image size, e.g. 1024x1024 (default: auto)
       --quality <q>     rendering quality, e.g. low|medium|high (default: auto)
       --background <b>  background, e.g. transparent|opaque (default: auto)
       --format <f>      output format: png|jpeg|webp (default: inferred from --output, else png)
       --moderation <m>  moderation sensitivity, e.g. low (default: auto)
-      --timeout <dur>   upstream timeout in seconds or as a duration (default: 120s)
+      --timeout <dur>   generation timeout, including async polling (default: 120s)
       --json            print a machine-readable result or error object on stdout
   -h, --help            show this help
       --version         show the version

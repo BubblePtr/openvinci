@@ -10,6 +10,7 @@ import (
 // TestLiveSmokeGeneration is the only test that spends money and touches the
 // network. It exists to catch upstream drift that the fake server cannot see,
 // so it is opt-in: VINCI_LIVE_TEST=1 go test ./... -run Live
+// VINCI_MODEL overrides --model for gateways that expose an alias.
 func TestLiveSmokeGeneration(t *testing.T) {
 	if os.Getenv("VINCI_LIVE_TEST") != "1" {
 		t.Skip("live smoke test is opt-in; set VINCI_LIVE_TEST=1 to run it")
@@ -25,15 +26,20 @@ func TestLiveSmokeGeneration(t *testing.T) {
 	dir := chdirTemp(t)
 	target := filepath.Join(dir, "live.png")
 
+	model := defaultModel
+	if override := os.Getenv("VINCI_MODEL"); override != "" {
+		model = override
+	}
+
 	code := h.run("a single flat red circle centred on a white background",
-		"-o", target, "--size", "1024x1024", "--quality", "low", "--json")
+		"-o", target, "--size", "1024x1024", "--quality", "low", "--model", model, "--json")
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0 (stdout: %s, stderr: %s)", code, h.out(), h.err())
 	}
 
 	got := decodeJSONOutput(t, h.out())
-	if got["model"] != "gpt-image-2" {
-		t.Errorf("model = %v, want gpt-image-2", got["model"])
+	if got["model"] != model {
+		t.Errorf("model = %v, want %s", got["model"], model)
 	}
 
 	data, err := os.ReadFile(target)

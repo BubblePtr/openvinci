@@ -63,7 +63,7 @@ func TestHelpPrintsUsageToStdout(t *testing.T) {
 	if code := h.run("--help"); code != 0 {
 		t.Fatalf("exit code = %d, want 0", code)
 	}
-	for _, want := range []string{"vinci", "--output", "--size", "--quality", "--background", "--format", "--moderation", "--timeout", "--json", "OPENAI_API_KEY", "OPENAI_BASE_URL", "vinci -o hero.png -- "} {
+	for _, want := range []string{"vinci", "--output", "--model", "--size", "--quality", "--background", "--format", "--moderation", "--timeout", "--json", "OPENAI_API_KEY", "OPENAI_BASE_URL", "vinci -o hero.png -- "} {
 		if !strings.Contains(h.out(), want) {
 			t.Errorf("help output missing %q", want)
 		}

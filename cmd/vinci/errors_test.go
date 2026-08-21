@@ -129,6 +129,56 @@ func TestModerationBlockIsItsOwnErrorCode(t *testing.T) {
 	}
 }
 
+func TestAsyncTaskFailureIsAPIError(t *testing.T) {
+	f := newFakeUpstream(t)
+	h := newHarnessWith(t, f)
+	dir := chdirTemp(t)
+	f.asyncTaskID = "task_fail"
+	f.asyncFailed = true
+	f.asyncFailMessage = "safety filter"
+
+	code := h.run("a red bicycle", "-o", filepath.Join(dir, "hero.png"), "--json")
+	if code != 3 {
+		t.Fatalf("exit code = %d, want 3 (stdout: %s, stderr: %s)", code, h.out(), h.err())
+	}
+	obj := errorObject(t, h.out())
+	if obj["code"] != "api_error" {
+		t.Errorf("error code = %v, want api_error", obj["code"])
+	}
+	if msg, _ := obj["message"].(string); !strings.Contains(msg, "safety filter") {
+		t.Errorf("error message = %q, want it to mention the upstream failure", msg)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "hero.png")); !os.IsNotExist(err) {
+		t.Errorf("output file exists, want no file written on a failed generation")
+	}
+}
+
+func TestAsyncTaskTimeoutIsNetworkError(t *testing.T) {
+	f := newFakeUpstream(t)
+	h := newHarnessWith(t, f)
+	dir := chdirTemp(t)
+	f.asyncTaskID = "task_hang"
+	f.asyncNeverDone = true
+
+	started := time.Now()
+	code := h.run("a red bicycle", "-o", filepath.Join(dir, "hero.png"), "--timeout", "0.2", "--json")
+	elapsed := time.Since(started)
+
+	if code != 3 {
+		t.Fatalf("exit code = %d, want 3 (stdout: %s)", code, h.out())
+	}
+	if elapsed > 3*time.Second {
+		t.Errorf("run took %s, want it to give up at the timeout", elapsed)
+	}
+	obj := errorObject(t, h.out())
+	if obj["code"] != "network_error" {
+		t.Errorf("error code = %v, want network_error", obj["code"])
+	}
+	if msg, _ := obj["message"].(string); !strings.Contains(msg, "timed out") {
+		t.Errorf("error message = %q, want it to mention the timeout", msg)
+	}
+}
+
 func TestSuccessStatusWithoutImageDataIsAPIError(t *testing.T) {
 	f := newFakeUpstream(t)
 	h := newHarnessWith(t, f)
