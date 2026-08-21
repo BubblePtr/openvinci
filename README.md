@@ -13,6 +13,20 @@ On success, plain mode prints only the absolute output path on stdout. `--json` 
 
 ## Quick start
 
+Paste this to an agent. That is the primary way to use OpenVinci.
+
+```text
+Read https://raw.githubusercontent.com/BubblePtr/openvinci/main/SKILL.md and follow the instructions to install and use vinci.
+```
+
+```text
+读取 https://raw.githubusercontent.com/BubblePtr/openvinci/main/SKILL.md，并按其中说明安装并使用 vinci。
+```
+
+The skill is the agent-facing contract. `vinci --help` is the live CLI contract if the two ever disagree. Discovery index: [llms.txt](https://raw.githubusercontent.com/BubblePtr/openvinci/main/llms.txt).
+
+To install and run it yourself:
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/BubblePtr/openvinci/main/install.sh | sh
 export PATH="$HOME/.local/bin:$PATH"
@@ -91,20 +105,6 @@ cat prompt.txt | vinci --background transparent --json -o ./assets/icon.png
 ```
 
 An existing target file is overwritten silently, so rerunning the same command is idempotent, like `curl -o`.
-
-## For AI agents
-
-Paste one of these to the agent. It will fetch the skill and do the rest.
-
-```text
-Read https://raw.githubusercontent.com/BubblePtr/openvinci/main/SKILL.md and follow the instructions to install and use vinci.
-```
-
-```text
-读取 https://raw.githubusercontent.com/BubblePtr/openvinci/main/SKILL.md，并按其中说明安装并使用 vinci。
-```
-
-The skill is the agent-facing contract. `vinci --help` is the live CLI contract if the two ever disagree. Discovery index: [llms.txt](https://raw.githubusercontent.com/BubblePtr/openvinci/main/llms.txt).
 
 ## Flags
 
