@@ -1,6 +1,6 @@
 # OpenVinci
 
-面向 AI Agent 的极简图片生成 CLI：Agent 通过一条 shell 命令（`vinci`）调用上游图片模型生成本地图片文件，无需 SDK、MCP 或常驻服务。定位一句话：**OpenVinci — visual tools for agents.**
+面向 AI Agent 的极简生图 CLI：一条 `vinci` 命令调用上游生图接口，为 Agent 补全文生图能力。无需 SDK、MCP 或常驻服务。定位一句话：**OpenVinci — image generation for agents.**
 
 ## Language
 

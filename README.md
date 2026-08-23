@@ -1,8 +1,10 @@
 # OpenVinci
 
-**OpenVinci — visual tools for agents.**
+[English](README.md) | [简体中文](README.zh-CN.md)
 
-`vinci` is a single static binary that turns a prompt into a local image file in one shell call. No SDK, no MCP server, no daemon — the kind of tool an AI coding agent can call in the middle of a task and parse the result of.
+**OpenVinci — image generation for agents.**
+
+`vinci` calls an image generation API in one shell call, giving agents text-to-image. No SDK, no MCP, no daemon.
 
 ```bash
 vinci "minimal technical illustration of an AI agent" -o ./assets/hero.png
@@ -19,10 +21,6 @@ Paste this to the agent:
 
 ```text
 Read https://raw.githubusercontent.com/BubblePtr/openvinci/main/SKILL.md and follow the instructions to install and use vinci.
-```
-
-```text
-读取 https://raw.githubusercontent.com/BubblePtr/openvinci/main/SKILL.md，并按其中说明安装并使用 vinci。
 ```
 
 The skill is the agent-facing contract. `vinci --help` is the live CLI contract if the two ever disagree. Discovery index: [llms.txt](https://raw.githubusercontent.com/BubblePtr/openvinci/main/llms.txt).
@@ -78,7 +76,7 @@ export OPENAI_BASE_URL="https://api.openai.com"            # optional; any OpenA
 | `OPENAI_API_KEY` | yes | The API key. Read from the environment only, never from a flag, so it stays out of shell history. |
 | `OPENAI_BASE_URL` | no | Any OpenAI-compatible gateway. Defaults to `https://api.openai.com`. A URL that already ends in `/v1` is accepted as-is. |
 
-The upstream model defaults to `gpt-image-2`. Override it with `--model` for a gateway alias. A generation is one prompt to one local file: either the upstream returns the image immediately (`b64_json` or `url`), or it returns a task id and `vinci` polls until the image is ready. Polling is waiting, not a retry. There is no automatic retry of a failed generation, so latency and cost stay predictable. The `--timeout` covers the whole generation, including polls and the image download.
+The upstream model defaults to `gpt-image-2`. Override it with `--model` for a gateway alias. One call is one image API request and one local file: either the upstream returns the image immediately (`b64_json` or `url`), or it returns a task id and `vinci` polls until the image is ready. Polling is waiting, not a retry. There is no automatic retry of a failed generation, so latency and cost stay predictable. The `--timeout` covers the whole generation, including polls and the image download.
 
 ## Usage
 
