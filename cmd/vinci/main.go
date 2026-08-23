@@ -1,4 +1,4 @@
-// Command vinci turns a prompt into a local image file with one shell call.
+// Command vinci calls an image generation API and writes one local file.
 //
 // main() is deliberately a one-line wrapper: run() is the only seam, so the
 // whole CLI contract (exit code, stdout, stderr, files written) is testable

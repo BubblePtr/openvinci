@@ -290,10 +290,10 @@ func resolvePrompt(opts *options, stdin io.Reader) *cliError {
 }
 
 func usageText() string {
-	return `vinci — visual tools for agents. Generate an image from a prompt.
+	return `vinci — image generation for agents. Call an image API from a prompt.
 
 Use it when a task needs an illustration, icon, hero image or other visual
-asset: one call turns a prompt into a local image file — no SDK, no MCP server.
+asset: one call to the image API writes a local file — no SDK, no MCP server.
 Agents should pass --json for machine-readable results and errors.
 
 Usage:
