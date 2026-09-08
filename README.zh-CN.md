@@ -4,7 +4,7 @@
 
 **OpenVinci — 面向 Agent 的生图工具。**
 
-`vinci` 用一条 shell 命令调用生图接口，为 Agent 补全文生图能力。无需 SDK、MCP 或常驻服务。
+`vinci` 用一条 shell 命令调用生图接口，为 Agent 提供文生图和本地图片编辑能力。无需 SDK、MCP 或常驻服务。
 
 ```bash
 vinci "minimal technical illustration of an AI agent" -o ./assets/hero.png
@@ -83,6 +83,7 @@ export OPENAI_BASE_URL="https://api.openai.com"            # 可选；任何 Ope
 ```bash
 vinci [flags] "<prompt>"
 echo "<prompt>" | vinci [flags]
+vinci --image input.png [--mask mask.png] "<编辑要求>"
 ```
 
 Prompt 来源于位置参数；当未提供位置参数时，则从 stdin 读取（便于传递包含引号和换行符的长 Prompt）。位置参数永远优先，此时不会读取 stdin，因此闲置的 pipe 不会阻塞 CLI。两者均未提供则属于用法错误。
@@ -106,11 +107,33 @@ cat prompt.txt | vinci --background transparent --json -o ./assets/icon.png
 
 已存在的目标文件会被静默覆盖，保证重复执行同一命令具有幂等性（类似 `curl -o`）。
 
+## 图片编辑
+
+```bash
+vinci --image input.png "将背景改成日落海滩" -o edited.png --json
+vinci --image subject.png --image reference.jpg "参考第二张图的配色修改第一张图" -o edited.webp --json
+vinci --image input.png --mask mask.png "在遮罩区域加入花束" -o edited.png --json
+```
+
+`--image` 可重复，按顺序传入多张本地图片。`--mask` 必须搭配输入图片：使用带 Alpha 通道的 PNG，尺寸与第一张输入图一致，透明区域表示编辑区域。格式、大小及模型限制由上游校验。需要保留原图时，请使用不同的输出路径。
+
+默认通过 multipart 表单上传文件至 `/v1/images/edits`。当主机名为 `api.apimart.ai` 且模型名以 `gpt-image-` 开头时，CLI 自动转用 `/v1/images/generations`，将本地图片以 Base64 Data URL 写入 `image_urls` 和可选的 `mask_url`，无需图床：
+
+```bash
+export OPENAI_BASE_URL="https://api.apimart.ai/v1"
+vinci --image input.png "将背景改成蓝色" \
+  --model gpt-image-2-official -o edited.png --json
+```
+
+Key 必须有对应模型权限。其他主机和非 GPT 模型保持默认上传协议；请求失败后不会切换协议重复提交。详细用法和实测记录见[图片编辑指南](docs/image-editing.md)。
+
 ## 参数选项 (Flags)
 
 | 选项 | 默认值 | 说明 |
 | --- | --- | --- |
 | `-o`, `--output <path>` | 根据 Prompt 派生的 slug 文件名（当前目录） | 输出路径。缺失的父目录会自动创建。 |
+| `--image <path>` | 无 | 本地输入图片，可重复传入多张；启用编辑模式。 |
+| `--mask <path>` | 无 | 第一张输入图的 PNG 遮罩，需要搭配 `--image`。 |
 | `--model <name>` | `gpt-image-2` | 上游模型。原样透传，兼容 `gpt-image-2-official` 等网关别名。 |
 | `--size <spec>` | `auto` | 图片尺寸，例如 `1024x1024`, `1536x1024`。直接透传给上游。 |
 | `--quality <q>` | `auto` | 渲染画质，例如 `low`, `medium`, `high`。 |
@@ -122,7 +145,7 @@ cat prompt.txt | vinci --background transparent --json -o ./assets/icon.png
 | `-h`, `--help` | | 显示使用帮助。 |
 | `--version` | | 显示版本号。 |
 
-Flag 参数值会直接透传给上游，本地不做重复校验，因此上游新增参数特性无需发版即可生效。
+模型渲染参数值会直接透传给上游，本地不做重复校验，因此上游新增参数特性无需发版即可生效。
 
 ## 输出契约
 
@@ -163,6 +186,7 @@ JSON 模式（失败）—— 写入 stdout，并返回非零退出码：
 | `api_error` | 3 | 上游拒绝或执行失败；错误信息包含 HTTP 状态码。报告错误信息，勿盲目重试。 |
 | `moderation_blocked` | 3 | 上游安全系统拦截了 Prompt。重写 Prompt，或尝试加 `--moderation low` 重试一次。 |
 | `network_error` | 3 | 无法连接上游，或达到 `--timeout` 超时。检查 `OPENAI_BASE_URL` 和网络配置。 |
+| `read_failed` | 4 | 输入图片或遮罩无法读取。检查本地路径和读取权限。 |
 | `write_failed` | 4 | 图片无法写入指定的输出路径。检查目标路径写权限。 |
 
 错误码属于公开契约的一部分：调用方（Agent）应基于错误码构建重试与错误处理分支，而非基于自然语言报错文本。

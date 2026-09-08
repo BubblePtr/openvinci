@@ -191,31 +191,25 @@ type upstreamError struct {
 }
 
 func requestImage(opts *options, apiKey, baseURL string) (generated, *cliError) {
-	payload := map[string]any{
-		"model":         opts.model,
-		"prompt":        opts.prompt,
-		"n":             1,
-		"size":          opts.size,
-		"quality":       opts.quality,
-		"background":    opts.background,
-		"moderation":    opts.moderation,
-		"output_format": opts.format,
-	}
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return generated{}, errorf(codeAPIError, exitAPI, "cannot encode request: %v", err)
+	apimart := usesAPIMartGPT(opts, baseURL)
+	body, contentType, cerr := imageRequestBody(opts, apimart)
+	if cerr != nil {
+		return generated{}, cerr
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), opts.timeout)
 	defer cancel()
 
 	endpoint := generationsEndpoint(baseURL)
+	if len(opts.images) > 0 && !apimart {
+		endpoint = apiRoot(baseURL) + "/images/edits"
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
 		return generated{}, errorf(codeNetworkError, exitAPI, "invalid upstream URL %s: %v", endpoint, err)
 	}
 	req.Header.Set("Authorization", "Bearer "+apiKey)
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", contentType)
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
