@@ -1,12 +1,14 @@
 # OpenVinci
 
-> Image generation for agents. `vinci` calls an image API in one shell call, giving agents text-to-image. No SDK, no MCP, no daemon.
+> Image generation for agents. `vinci` calls an image API in one shell call, giving agents text-to-image and local image editing. No SDK, no MCP, no daemon.
 
 ## Docs
 
 - [SKILL.md](https://raw.githubusercontent.com/BubblePtr/openvinci/main/SKILL.md): Agent install and calling contract — start here
 - [README.md](https://raw.githubusercontent.com/BubblePtr/openvinci/main/README.md): Human-facing install and usage
 - [install.sh](https://raw.githubusercontent.com/BubblePtr/openvinci/main/install.sh): One-line installer used by the skill
+
+- [Image editing](https://raw.githubusercontent.com/BubblePtr/openvinci/main/docs/image-editing.md): Local images, masks, and APIMart Base64 support
 
 ## Optional
 

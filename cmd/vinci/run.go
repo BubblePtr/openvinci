@@ -29,6 +29,7 @@ const (
 	codeAPIError         = "api_error"
 	codeModerationBlock  = "moderation_blocked"
 	codeNetworkError     = "network_error"
+	codeReadFailed       = "read_failed"
 	codeWriteFailed      = "write_failed"
 	defaultModel         = "gpt-image-2"
 	defaultBaseURL       = "https://api.openai.com"
@@ -122,6 +123,8 @@ func splitFlag(arg string) (name, value string, hasValue bool) {
 }
 
 type options struct {
+	images         []string
+	mask           string
 	prompt         string
 	output         string
 	model          string
@@ -213,6 +216,18 @@ func parseArgs(args []string) (*options, *cliError) {
 			}
 		case "o", "output":
 			opts.output, perr = takeValue()
+		case "image":
+			var path string
+			path, perr = takeValue()
+			if perr == nil && path == "" {
+				perr = usageErrorf("flag --image needs a non-empty path")
+			}
+			opts.images = append(opts.images, path)
+		case "mask":
+			opts.mask, perr = takeValue()
+			if perr == nil && opts.mask == "" {
+				perr = usageErrorf("flag --mask needs a non-empty path")
+			}
 		case "model":
 			opts.model, perr = takeValue()
 		case "size":
@@ -241,6 +256,9 @@ func parseArgs(args []string) (*options, *cliError) {
 
 	if opts.help || opts.version {
 		return opts, nil
+	}
+	if opts.mask != "" && len(opts.images) == 0 {
+		return opts, usageErrorf("--mask requires --image")
 	}
 	if len(positional) > 1 {
 		return opts, usageErrorf("expected at most one prompt argument, got %d", len(positional))
@@ -290,7 +308,7 @@ func resolvePrompt(opts *options, stdin io.Reader) *cliError {
 }
 
 func usageText() string {
-	return `vinci — image generation for agents. Call an image API from a prompt.
+	return `vinci — image generation for agents. Generate or edit images from a prompt.
 
 Use it when a task needs an illustration, icon, hero image or other visual
 asset: one call to the image API writes a local file — no SDK, no MCP server.
@@ -299,13 +317,23 @@ Agents should pass --json for machine-readable results and errors.
 Usage:
   vinci [flags] "<prompt>"
   echo "<prompt>" | vinci [flags]
+  vinci --image input.png [--mask mask.png] "<edit prompt>"
 
 The prompt is the positional argument; stdin is read only when no positional
 argument is given. Use -- to end flag parsing for a prompt starting with "-":
   vinci -o hero.png -- "-a prompt starting with a dash"
 
+Editing:
+  Repeat --image for multiple local inputs. --mask uses a PNG alpha mask with
+  the same dimensions as the first input; transparent areas indicate edits.
+  Default: multipart /v1/images/edits. For api.apimart.ai with gpt-image- models,
+  local images and masks are sent as Base64 JSON to /v1/images/generations.
+  No image hosting is needed. Use a separate output path to preserve the input.
+
 Flags:
   -o, --output <path>   output file path (default: slug filename from the prompt, in the current directory)
+      --image <path>    edit a local image; repeat for multiple inputs
+      --mask <path>     optional PNG mask for the first input image; requires --image
       --model <name>    upstream model (default: gpt-image-2)
       --size <spec>     image size, e.g. 1024x1024 (default: auto)
       --quality <q>     rendering quality, e.g. low|medium|high (default: auto)

@@ -1,13 +1,13 @@
 ---
 name: vinci
-description: Generate a local image file from a text prompt with one `vinci` shell call. Use when a task needs an illustration, icon, hero image, or other visual asset. No SDK, no MCP. Requires OPENAI_API_KEY in the environment.
+description: Generate or edit a local image file from a text prompt with one `vinci` shell call. Use when a task needs an illustration, icon, hero image, or other visual asset. No SDK, no MCP. Requires OPENAI_API_KEY in the environment.
 ---
 
 # vinci
 
 **Canonical URL**: `https://raw.githubusercontent.com/BubblePtr/openvinci/main/SKILL.md`
 **Audience**: AI coding agents (Claude Code, Codex, Cursor, Grok Build, and other shell-capable agents)
-**Purpose**: Install `vinci` if needed, then turn a prompt into a local image file with a stable JSON contract.
+**Purpose**: Install `vinci` if needed, then generate or edit a local image file with a stable JSON contract.
 
 ## What this document is
 
@@ -45,7 +45,7 @@ Optional: `OPENAI_BASE_URL` for an OpenAI-compatible gateway. A URL that already
 
 If `OPENAI_API_KEY` is unset, ask the human to export it. Do not have them paste it into a flag.
 
-## Step 3 — generate
+## Step 3 — generate or edit
 
 ```bash
 vinci "PROMPT" -o ./path/to/out.png --json
@@ -57,6 +57,20 @@ vinci "PROMPT" -o ./path/to/out.png --json
 - A prompt that starts with `-` needs `--`: `vinci -o out.png -- "-leading dash"`.
 - Gateway alias: add `--model NAME`.
 - `--size`, `--quality`, `--background`, `--format`, `--moderation`, `--timeout` pass through unchanged. Run `vinci --help` for the live list.
+
+### Edit local images
+
+```bash
+vinci --image input.png "EDIT PROMPT" -o edited.png --json
+vinci --image input.png --image reference.jpg "EDIT PROMPT" -o edited.png --json
+vinci --image input.png --mask mask.png "EDIT PROMPT" -o edited.png --json
+```
+
+- Repeat `--image` to supply multiple local images in order. Keep a separate `-o` path to preserve the original.
+- `--mask` requires `--image`: use a PNG with an alpha channel, matching the first input's dimensions. Transparent areas indicate where to edit.
+- Default uploads use multipart `/v1/images/edits`. For host `api.apimart.ai` with a `gpt-image-` model, Vinci automatically uses JSON `/v1/images/generations` with Base64 `image_urls` and optional `mask_url`. Do not upload local images to a separate hosting service or build the Base64 payload yourself.
+- Keep the human's configured model alias, e.g. `--model gpt-image-2-official`. Vinci does not read `VINCI_MODEL` automatically.
+- Run `vinci --help` to check that the installed version supports `--image`; an older release may require updating or building from source.
 
 ## Step 4 — read the result
 
@@ -71,6 +85,7 @@ Non-zero: parse `error.code`:
 | `api_error` | 3 | report the message; do not blindly retry |
 | `moderation_blocked` | 3 | rewrite the prompt, or retry once with `--moderation low` |
 | `network_error` | 3 | check `OPENAI_BASE_URL` and `--timeout`; retry only if the human asks |
+| `read_failed` | 4 | check the input image or mask path and read permissions |
 | `write_failed` | 4 | pick a writable `-o` path |
 
 `--timeout` covers submit, async polling, and download (default 120s). Do not wrap a failed generation in your own retry loop.
