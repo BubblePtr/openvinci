@@ -25,6 +25,8 @@ vinci "minimal technical illustration of an AI agent" -o ./assets/hero.png
 
 Skill 文档是面向 Agent 的标准调用契约。若文档与实际行为有分歧，以 `vinci --help` 实时 CLI 契约为准。探索索引：[llms.txt](https://raw.githubusercontent.com/BubblePtr/openvinci/main/llms.txt)。
 
+首次使用时，Agent 会集中询问默认模型、API Base URL 和 API Key，并复用已提供的信息。推荐模型为 `gpt-image-2.5-flare`；选定的配置会保存到用户配置目录，供后续调用加载。已有配置完整时不再询问，也可以选择仅用于当前会话。详见[首次使用指南](docs/first-use.md)。
+
 ### 手动使用
 
 ```bash
@@ -64,7 +66,7 @@ go build -o vinci ./cmd/vinci
 
 ## 配置
 
-仅需两个环境变量，无配置文件：
+CLI 读取两个环境变量。Agent Skill 可以保存、加载用户配置文件，CLI 本身不会自动读取该文件。手动使用时可设置：
 
 ```bash
 export OPENAI_API_KEY="sk-..."                             # 必填
@@ -76,7 +78,9 @@ export OPENAI_BASE_URL="https://api.openai.com"            # 可选；任何 Ope
 | `OPENAI_API_KEY` | 是 | API Key。仅从环境变量读取，绝不通过命令行 flag 传入，避免泄漏至 shell 历史记录。 |
 | `OPENAI_BASE_URL` | 否 | 任何 OpenAI 兼容网关。默认为 `https://api.openai.com`。若 URL 已以 `/v1` 结尾，会直接原样接受。 |
 
-上游模型默认是 `gpt-image-2`。网关别名用 `--model` 覆盖。一次调用就是调一次生图接口、写出一张本地图片：上游要么立刻返回图片（`b64_json` 或 `url`），要么返回任务 ID，由 `vinci` 内部轮询到出图。轮询是等同一张图，不是失败后重试。失败不会自动重试，延迟和成本可预期。`--timeout` 覆盖提交、轮询和下载整段。
+上游模型默认是 `gpt-image-2.5-flare`。可用 `--model` 选择当前 Key 已开通的官方模型或网关别名。Skill 将用户选定的默认模型保存为 `VINCI_MODEL`，每次调用时通过 `--model` 传入；CLI 本身不会读取 `VINCI_MODEL`。一次调用就是调一次生图接口、写出一张本地图片：上游要么立刻返回图片（`b64_json` 或 `url`），要么返回任务 ID，由 `vinci` 内部轮询到出图。轮询是等同一张图，不是失败后重试。失败不会自动重试，延迟和成本可预期。`--timeout` 覆盖提交、轮询和下载整段。
+
+GPT Image 2.5 有两个型号：`gpt-image-2.5-flare` 适合快速日常生图，`gpt-image-2.5-sunburst` 侧重精细编辑。两者都支持生成和编辑，画质在 `low`、`medium`、`high`、`auto` 之外增加了 `xhigh` 和 `max`。可用性和参数执行情况取决于上游。调用示例、FlatRouter 配置及实测参数差异见[模型与画质指南](docs/image-models.md)。
 
 ## 使用方法
 
@@ -134,9 +138,9 @@ Key 必须有对应模型权限。其他主机和非 GPT 模型保持默认上�
 | `-o`, `--output <path>` | 根据 Prompt 派生的 slug 文件名（当前目录） | 输出路径。缺失的父目录会自动创建。 |
 | `--image <path>` | 无 | 本地输入图片，可重复传入多张；启用编辑模式。 |
 | `--mask <path>` | 无 | 第一张输入图的 PNG 遮罩，需要搭配 `--image`。 |
-| `--model <name>` | `gpt-image-2` | 上游模型。原样透传，兼容 `gpt-image-2-official` 等网关别名。 |
+| `--model <name>` | `gpt-image-2.5-flare` | 当前 Key 已开通的官方模型或网关别名。原样透传，包括 GPT Image 2.5 型号。 |
 | `--size <spec>` | `auto` | 图片尺寸，例如 `1024x1024`, `1536x1024`。直接透传给上游。 |
-| `--quality <q>` | `auto` | 渲染画质，例如 `low`, `medium`, `high`。 |
+| `--quality <q>` | `auto` | 渲染画质：`low`、`medium`、`high`、`auto`；GPT Image 2.5 另支持 `xhigh`、`max`，需上游支持。 |
 | `--background <b>` | `auto` | 背景，例如 `transparent`, `opaque`。 |
 | `--format <f>` | 根据 `--output` 推断，否则为 `png` | 输出格式：`png`, `jpeg` 或 `webp`。与输出路径扩展名冲突时报错。 |
 | `--moderation <m>` | `auto` | 审核敏感度，例如 `low`（在 Prompt 被过度拒绝拦截时使用）。 |
@@ -145,7 +149,7 @@ Key 必须有对应模型权限。其他主机和非 GPT 模型保持默认上�
 | `-h`, `--help` | | 显示使用帮助。 |
 | `--version` | | 显示版本号。 |
 
-模型渲染参数值会直接透传给上游，本地不做重复校验，因此上游新增参数特性无需发版即可生效。
+模型名和已有渲染选项的取值会直接透传给上游，本地不做重复校验。新增模型名和画质档位无需 CLI 发版即可传入；上游是否接受、是否实际执行，需要分别确认。
 
 ## 输出契约
 
@@ -154,10 +158,10 @@ Key 必须有对应模型权限。其他主机和非 GPT 模型保持默认上�
 JSON 模式（成功）：
 
 ```json
-{"path":"/home/you/project/assets/hero.png","size":"1024x1024","format":"png","model":"gpt-image-2","duration_ms":8421}
+{"path":"/home/you/project/assets/hero.png","size":"1024x1024","format":"png","model":"gpt-image-2.5-flare","duration_ms":8421}
 ```
 
-`size` 为上游返回的实际生成图片尺寸；若上游未返回，则使用请求时的设定值（未指定时为 `auto`）。
+`size` 为上游回报的图片尺寸；若上游未返回，则使用请求时的设定值（未指定时为 `auto`）。Vinci 不读取图片像素来校验尺寸。`model` 是请求的模型名或网关别名，不能用来确认实际执行的模型；此 JSON 结果未包含上游返回的 `model` 和 `quality` 字段。
 
 JSON 模式（失败）—— 写入 stdout，并返回非零退出码：
 

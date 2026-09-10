@@ -13,6 +13,8 @@ printf '将画面改成水彩风格' | vinci --image input.png -o edited.png
 
 编辑支持现有 `--size`、`--quality`、`--background`、`--format`、`--moderation`、`--timeout` 和 `--json`。一次调用输出一张图片，支持即时 base64、图片 URL 及兼容网关的异步任务返回。输入文件在内存中组装为上传请求，适合常规图片文件。
 
+使用 GPT Image 2.5 时，可通过 `--model` 选择 `gpt-image-2.5-flare` 或 `gpt-image-2.5-sunburst`。两个型号的画质选项、FlatRouter 调用示例和实测限制见[模型与画质指南](image-models.md)。
+
 空路径或单独传入遮罩返回退出码 `2`、`usage_error`；本地文件读取失败返回退出码 `4`、`read_failed`，不会提交上游请求。成功输出、上游错误、输出格式推断和覆盖行为与图片生成一致。需要保留原图时，请使用不同的输出路径。
 
 接口参考：[OpenAI 图片编辑文档](https://developers.openai.com/api/reference/resources/images/methods/edit)。

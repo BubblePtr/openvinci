@@ -252,7 +252,7 @@ func TestGenerateSendsOneUpstreamRequestWithDefaults(t *testing.T) {
 		t.Errorf("Content-Type = %q, want application/json", call.ctype)
 	}
 	want := map[string]any{
-		"model":         "gpt-image-2",
+		"model":         "gpt-image-2.5-flare",
 		"prompt":        "a red bicycle",
 		"size":          "auto",
 		"quality":       "auto",
