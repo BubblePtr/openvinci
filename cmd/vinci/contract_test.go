@@ -310,8 +310,8 @@ func TestJSONModeSuccessShape(t *testing.T) {
 	if got["format"] != "png" {
 		t.Errorf("format = %v, want png", got["format"])
 	}
-	if got["model"] != "gpt-image-2" {
-		t.Errorf("model = %v, want gpt-image-2", got["model"])
+	if got["model"] != "gpt-image-2.5-flare" {
+		t.Errorf("model = %v, want gpt-image-2.5-flare", got["model"])
 	}
 	if _, ok := got["duration_ms"].(float64); !ok {
 		t.Errorf("duration_ms = %v, want a number", got["duration_ms"])

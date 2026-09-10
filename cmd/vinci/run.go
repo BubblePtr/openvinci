@@ -31,7 +31,7 @@ const (
 	codeNetworkError     = "network_error"
 	codeReadFailed       = "read_failed"
 	codeWriteFailed      = "write_failed"
-	defaultModel         = "gpt-image-2"
+	defaultModel         = "gpt-image-2.5-flare"
 	defaultBaseURL       = "https://api.openai.com"
 	defaultTimeout       = 120 * time.Second
 	defaultFormat        = "png"
@@ -323,6 +323,14 @@ The prompt is the positional argument; stdin is read only when no positional
 argument is given. Use -- to end flag parsing for a prompt starting with "-":
   vinci -o hero.png -- "-a prompt starting with a dash"
 
+Models:
+  Default: gpt-image-2.5-flare. Use --model for an official model or gateway alias
+  enabled for your API key. GPT Image 2.5 models:
+    gpt-image-2.5-flare     fast everyday image generation
+    gpt-image-2.5-sunburst  image generation and precise editing
+  GPT Image 2.5 adds xhigh and max quality settings. Model names and rendering
+  options pass through unchanged; available features depend on the upstream.
+
 Editing:
   Repeat --image for multiple local inputs. --mask uses a PNG alpha mask with
   the same dimensions as the first input; transparent areas indicate edits.
@@ -334,9 +342,9 @@ Flags:
   -o, --output <path>   output file path (default: slug filename from the prompt, in the current directory)
       --image <path>    edit a local image; repeat for multiple inputs
       --mask <path>     optional PNG mask for the first input image; requires --image
-      --model <name>    upstream model (default: gpt-image-2)
+      --model <name>    upstream model (default: gpt-image-2.5-flare)
       --size <spec>     image size, e.g. 1024x1024 (default: auto)
-      --quality <q>     rendering quality, e.g. low|medium|high (default: auto)
+      --quality <q>     rendering quality, e.g. low|medium|high|xhigh|max (default: auto)
       --background <b>  background, e.g. transparent|opaque (default: auto)
       --format <f>      output format: png|jpeg|webp (default: inferred from --output, else png)
       --moderation <m>  moderation sensitivity, e.g. low (default: auto)
@@ -352,6 +360,9 @@ Environment:
 Output:
   Plain mode prints only the absolute output path on stdout; diagnostics go to stderr.
   --json prints {"path","size","format","model","duration_ms"}, or {"error":{"code","message"}} on failure.
+  model is the requested name. size is reported by the upstream, or falls back
+  to the requested value. Vinci does not verify the image's pixel dimensions
+  or expose the upstream's model and quality fields.
 
 Exit codes:
   0 success   1 generic   2 usage   3 upstream API   4 local IO

@@ -5,10 +5,12 @@
 ## Docs
 
 - [SKILL.md](https://raw.githubusercontent.com/BubblePtr/openvinci/main/SKILL.md): Agent install and calling contract — start here
+- [First use](https://raw.githubusercontent.com/BubblePtr/openvinci/main/docs/first-use.md): Agent-guided model, API Base URL, and API key setup with reusable local configuration (Chinese)
 - [README.md](https://raw.githubusercontent.com/BubblePtr/openvinci/main/README.md): Human-facing install and usage
 - [install.sh](https://raw.githubusercontent.com/BubblePtr/openvinci/main/install.sh): One-line installer used by the skill
 
 - [Image editing](https://raw.githubusercontent.com/BubblePtr/openvinci/main/docs/image-editing.md): Local images, masks, and APIMart Base64 support
+- [Image models and quality](https://raw.githubusercontent.com/BubblePtr/openvinci/main/docs/image-models.md): GPT Image 2.5 model selection, FlatRouter setup, and live verification limits (Chinese)
 
 ## Optional
 

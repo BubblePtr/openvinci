@@ -25,6 +25,8 @@ Read https://raw.githubusercontent.com/BubblePtr/openvinci/main/SKILL.md and fol
 
 The skill is the agent-facing contract. `vinci --help` is the live CLI contract if the two ever disagree. Discovery index: [llms.txt](https://raw.githubusercontent.com/BubblePtr/openvinci/main/llms.txt).
 
+On first use, the agent asks for the default model, API Base URL, and API key, reusing any values already supplied. It suggests `gpt-image-2.5-flare` and saves the chosen settings in your user configuration directory for later calls. Complete existing settings are reused without asking again; session-only setup is also supported. See the [first-use guide](docs/first-use.md) (Chinese).
+
 ### Manual
 
 ```bash
@@ -64,7 +66,7 @@ go build -o vinci ./cmd/vinci
 
 ## Configuration
 
-Two environment variables, no config file. Copy and fill in:
+The CLI reads two environment variables. The agent skill can save and load a user configuration profile; the CLI does not read that file automatically. For manual use, copy and fill in:
 
 ```bash
 export OPENAI_API_KEY="sk-..."                             # required
@@ -76,7 +78,9 @@ export OPENAI_BASE_URL="https://api.openai.com"            # optional; any OpenA
 | `OPENAI_API_KEY` | yes | The API key. Read from the environment only, never from a flag, so it stays out of shell history. |
 | `OPENAI_BASE_URL` | no | Any OpenAI-compatible gateway. Defaults to `https://api.openai.com`. A URL that already ends in `/v1` is accepted as-is. |
 
-The upstream model defaults to `gpt-image-2`. Override it with `--model` for a gateway alias. One call is one image API request and one local file: either the upstream returns the image immediately (`b64_json` or `url`), or it returns a task id and `vinci` polls until the image is ready. Polling is waiting, not a retry. There is no automatic retry of a failed generation, so latency and cost stay predictable. The `--timeout` covers the whole generation, including polls and the image download.
+The upstream model defaults to `gpt-image-2.5-flare`. Use `--model` for any official model or gateway alias enabled for your API key. The skill records a user-selected default as `VINCI_MODEL` and passes it through `--model` on each call; the CLI does not read `VINCI_MODEL` itself. One call is one image API request and one local file: either the upstream returns the image immediately (`b64_json` or `url`), or it returns a task id and `vinci` polls until the image is ready. Polling is waiting, not a retry. There is no automatic retry of a failed generation, so latency and cost stay predictable. The `--timeout` covers the whole generation, including polls and the image download.
+
+For GPT Image 2.5, select `gpt-image-2.5-flare` for fast everyday generation or `gpt-image-2.5-sunburst` for precise editing. Both support generation and editing, with `xhigh` and `max` quality settings in addition to `low`, `medium`, `high`, and `auto`. Availability and parameter handling depend on the upstream. See the [model and quality guide](docs/image-models.md) (Chinese) for examples, FlatRouter setup, and observed parameter differences.
 
 ## Usage
 
@@ -134,9 +138,9 @@ The model must be enabled for your API key. Other hosts and non-GPT models retai
 | `-o`, `--output <path>` | slug filename from the prompt, in the current directory | Output path. Missing parent directories are created. |
 | `--image <path>` | none | Local input image. Repeat for multiple inputs; enables editing. |
 | `--mask <path>` | none | PNG mask for the first input image; requires `--image`. |
-| `--model <name>` | `gpt-image-2` | Upstream model. Passed through unchanged, so a gateway alias such as `gpt-image-2-official` works. |
+| `--model <name>` | `gpt-image-2.5-flare` | Official model or gateway alias enabled for your API key. Passed through unchanged, including GPT Image 2.5 model names. |
 | `--size <spec>` | `auto` | Image size, e.g. `1024x1024`, `1536x1024`. Passed straight through to the upstream. |
-| `--quality <q>` | `auto` | Rendering quality, e.g. `low`, `medium`, `high`. |
+| `--quality <q>` | `auto` | Rendering quality: `low`, `medium`, `high`, `auto`; GPT Image 2.5 also supports `xhigh` and `max`. Upstream support is required. |
 | `--background <b>` | `auto` | Background, e.g. `transparent`, `opaque`. |
 | `--format <f>` | inferred from `--output`, else `png` | `png`, `jpeg` or `webp`. Contradicting the output extension is a usage error. |
 | `--moderation <m>` | `auto` | Moderation sensitivity, e.g. `low`, for when a prompt is refused unfairly. |
@@ -145,7 +149,7 @@ The model must be enabled for your API key. Other hosts and non-GPT models retai
 | `-h`, `--help` | | Show usage. |
 | `--version` | | Show the version. |
 
-Model rendering options are passed through to the upstream without being re-validated locally, so upstream additions work without a new release.
+Model names and values for existing rendering flags pass through without local validation. New model names and quality settings can be sent without a new release; the upstream determines whether they are accepted and applied.
 
 ## Output
 
@@ -154,10 +158,10 @@ Plain mode, success: one line on stdout, the absolute output path. All diagnosti
 JSON mode, success:
 
 ```json
-{"path":"/home/you/project/assets/hero.png","size":"1024x1024","format":"png","model":"gpt-image-2","duration_ms":8421}
+{"path":"/home/you/project/assets/hero.png","size":"1024x1024","format":"png","model":"gpt-image-2.5-flare","duration_ms":8421}
 ```
 
-`size` is the size the upstream reports for the generated image; if the upstream omits it, the requested value is used (`auto` when you did not ask for one).
+`size` is the size the upstream reports for the generated image; if the upstream omits it, the requested value is used (`auto` when you did not ask for one). Vinci does not inspect the image's pixel dimensions. `model` is the requested model name, including any gateway alias; it does not verify which model ran. The upstream's `model` and `quality` fields are not included in this JSON result.
 
 JSON mode, failure — written to stdout, with a non-zero exit code:
 
